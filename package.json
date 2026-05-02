@@ -1,0 +1,14 @@
+{
+  "name": "memory-refactor",
+  "private": true,
+  "packageManager": "pnpm@9.12.3",
+  "scripts": {
+    "dev:web": "pnpm --filter @memory-refactor/web dev",
+    "lint:web": "pnpm --filter @memory-refactor/web lint",
+    "typecheck:web": "pnpm --filter @memory-refactor/web typecheck"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}
