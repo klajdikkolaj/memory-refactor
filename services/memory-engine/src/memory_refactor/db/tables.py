@@ -48,11 +48,30 @@ class MemoryUnitRecord(TimestampMixin, Base):
     versions: Mapped[list[MemoryVersionRecord]] = relationship(back_populates="memory")
 
 
+class RawMemoryEventRecord(Base):
+    __tablename__ = "raw_memory_events"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("evt"))
+    source_type: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    source_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    extra: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+    sources: Mapped[list[MemorySourceRecord]] = relationship(back_populates="raw_event")
+
+
 class MemorySourceRecord(Base):
     __tablename__ = "memory_sources"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("src"))
     memory_id: Mapped[str] = mapped_column(ForeignKey("memory_units.id"), index=True, nullable=False)
+    raw_event_id: Mapped[str | None] = mapped_column(ForeignKey("raw_memory_events.id"), index=True)
     source_type: Mapped[str] = mapped_column(String(64), nullable=False)
     source_id: Mapped[str] = mapped_column(String(128), nullable=False)
     excerpt: Mapped[str | None] = mapped_column(Text)
@@ -64,12 +83,20 @@ class MemorySourceRecord(Base):
     )
 
     memory: Mapped[MemoryUnitRecord] = relationship(back_populates="sources")
+    raw_event: Mapped[RawMemoryEventRecord | None] = relationship(back_populates="sources")
 
 
 class RefactorRunRecord(TimestampMixin, Base):
     __tablename__ = "refactor_runs"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("run"))
+    plan_id: Mapped[str] = mapped_column(
+        String(32),
+        unique=True,
+        index=True,
+        nullable=False,
+        default=lambda: new_id("plan"),
+    )
     status: Mapped[str] = mapped_column(
         String(32),
         default=RefactorRunStatus.PENDING.value,
@@ -79,6 +106,7 @@ class RefactorRunRecord(TimestampMixin, Base):
     summary: Mapped[str] = mapped_column(Text, nullable=False)
     workflow_id: Mapped[str | None] = mapped_column(String(128))
     trace_id: Mapped[str | None] = mapped_column(String(128))
+    input_event_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
 
     operations: Mapped[list[MemoryOperationRecord]] = relationship(
         back_populates="run",
@@ -100,7 +128,9 @@ class MemoryOperationRecord(TimestampMixin, Base):
         nullable=False,
     )
     operation: Mapped[str] = mapped_column(String(64), nullable=False)
+    position: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     source_memory_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    source_event_ids: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     proposed_memory: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     rationale: Mapped[str] = mapped_column(Text, nullable=False)
     confidence: Mapped[float] = mapped_column(Float, default=0.75, nullable=False)

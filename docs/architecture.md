@@ -5,7 +5,7 @@
 The durable primitive is a typed memory operation. Agents should propose operations, not mutate memory directly.
 
 ```txt
-raw events -> memory units -> refactor plan -> memory PR -> approved operations -> versions
+raw events -> refactor plan -> Memory PR -> approved operations -> clean memory units -> versions
 ```
 
 ## Service Map
@@ -53,13 +53,13 @@ Future systems should be introduced through ports/adapters so the MVP does not d
 
 ## Core Product Loop
 
-1. Ingest raw memory event.
-2. Normalize into a candidate memory unit.
-3. Retrieve related memories by source, semantic similarity, and relationships.
-4. Ask the refactor agent for a schema-valid `RefactorPlan`.
-5. Persist the plan as a Memory PR.
-6. Let the user approve, reject, or edit operations.
-7. Apply approved operations transactionally.
+1. Ingest raw memory events as append-only evidence.
+2. Retrieve related clean memories by source, semantic similarity, and relationships.
+3. Ask the refactor agent for a schema-valid `RefactorPlan`.
+4. Persist the plan as a Memory PR with raw event evidence.
+5. Let the user approve, reject, or edit operations.
+6. Apply approved operations transactionally to clean memory units.
+7. Mark raw events processed only after a durable plan or approved operation path is recorded.
 8. Write immutable versions and trace metadata.
 
 ## First Data Model

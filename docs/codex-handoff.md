@@ -1,8 +1,8 @@
 # Codex Handoff
 
 - Goal: Build the initial AI memory refactor product structure.
-- Current state: Standard Codex operating scaffold plus initial product monorepo structure is in place.
-- Files changed: Added repo docs, planning docs, repo-local Codex skills, Next.js web shell, Python memory-engine service, database foundation, memory create/list API persistence, Temporal worker placeholders, and local infra Compose files.
-- Checks run: `make check-structure`, `docker compose config`, JSON parse checks for package manifests, TOML parse check for `services/memory-engine/pyproject.toml`, ASCII scan for added scaffold files.
-- Open risks: `uv` is not installed locally, so dependency-backed Python tests and Alembic migration execution did not run. Web dependencies were not installed, so Next.js lint/type-check/browser verification did not run.
-- Next recommended step: Install toolchains, then start `T1.6` from `docs/tasks.md`: persist refactor runs and operations.
+- Current state: Standard Codex operating scaffold plus initial product monorepo structure is in place. Raw memory events, memory units, preview refactor plans, and Temporal workflow-start runs are now persisted through Postgres-backed repositories.
+- Files changed: Added repo docs, planning docs, testing strategy, repo-local Codex skills and reviewer agents, Next.js web shell, Python memory-engine service, database foundation, raw memory event API/persistence, memory create/list API persistence, refactor run/operation preview persistence, Temporal workflow start endpoint, Temporal activity persistence path, local infra Compose files, and initial FE/BE test harnesses.
+- Checks run: `make check-structure`, `docker compose config`, `make test-python-unit`, `make test-python-integration`, `make check-web`, `make test-web-unit`, `make test-web-e2e`, `uv run --extra dev ruff check src tests alembic`, Alembic `upgrade head` and `downgrade base` against a clean throwaway database, JSON parse checks for package manifests, TOML parse check for `services/memory-engine/pyproject.toml`, ASCII scan for added scaffold files.
+- Open risks: CI is still pending as `T9.4`. The default local `memory_refactor` database may contain tables created by earlier `Base.metadata.create_all` integration runs, so `make migrate` can fail there until that dev schema is reset or stamped; migrations validated successfully on a clean database.
+- Next recommended step: Start `T2.2` from `docs/tasks.md`: add a manual pasted-memory batch flow that creates raw events and starts a Memory PR run from them.

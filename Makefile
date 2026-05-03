@@ -1,4 +1,4 @@
-.PHONY: check-structure infra-up infra-down dev-web dev-api dev-worker test-python migrate check-web compose-config
+.PHONY: check-structure infra-up infra-down dev-web dev-api dev-worker test test-python test-python-unit test-python-integration migrate check-web test-web-unit test-web-e2e compose-config
 
 check-structure:
 	test -f AGENTS.md
@@ -27,11 +27,25 @@ dev-worker:
 	cd services/memory-engine && uv run memory-worker
 
 test-python:
-	cd services/memory-engine && uv run pytest
+	cd services/memory-engine && uv run --extra dev pytest
+
+test-python-unit:
+	cd services/memory-engine && uv run --extra dev pytest -m "not integration"
+
+test-python-integration:
+	cd services/memory-engine && RUN_INTEGRATION_TESTS=1 uv run --extra dev pytest -m integration
 
 migrate:
-	cd services/memory-engine && uv run alembic upgrade head
+	cd services/memory-engine && uv run --extra dev alembic upgrade head
 
 check-web:
 	pnpm --filter @memory-refactor/web lint
 	pnpm --filter @memory-refactor/web typecheck
+
+test-web-unit:
+	pnpm --filter @memory-refactor/web test:unit
+
+test-web-e2e:
+	pnpm --filter @memory-refactor/web test:e2e
+
+test: test-python-unit test-web-unit

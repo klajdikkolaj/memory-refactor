@@ -25,6 +25,7 @@ The product should behave like an AI infrastructure system:
 - `docs/epics.md`: durable product epics and success criteria.
 - `docs/stories.md`: user/operator stories grouped by epic.
 - `docs/tasks.md`: implementation queue with priorities and status.
+- `docs/testing-strategy.md`: test layers, commands, and quality gates.
 
 ## MVP Boundary
 

@@ -36,6 +36,8 @@ Acceptance criteria:
 - `AGENTS.md` is short and operational.
 - `docs/codex-context.md` explains the product and architecture boundaries.
 - Repo-local skills exist for workflow, next task, handoff, and parallel work.
+- Repo-specific skills exist for repeated DB, API, UI, memory-operation, test-gate, and ship workflows.
+- Read-only reviewer agents exist for repeated database, UI, test-gate, and architecture review passes.
 
 ### S0.3: Track Product Work In Docs
 
@@ -281,3 +283,54 @@ Acceptance criteria:
 - Event publisher port exists.
 - NATS JetStream implementation is optional.
 - Event names and payload contracts are documented.
+
+## E9: Testing And Quality Gates
+
+### S9.1: Document Test Strategy
+
+Status: `done`
+
+As a developer, I want a clear test strategy so backend, frontend, integration, and E2E expectations are explicit.
+
+Acceptance criteria:
+
+- `docs/testing-strategy.md` exists.
+- Commands and test layers are documented.
+- Runtime-dependent tests are clearly separated from unit tests.
+
+### S9.2: Prepare Backend Test Harness
+
+Status: `in-progress`
+
+As a backend developer, I want unit and integration test commands so persistence and API behavior can be verified safely.
+
+Acceptance criteria:
+
+- Pytest markers distinguish integration tests.
+- Unit tests run without external services.
+- Integration tests are skipped unless explicitly enabled.
+- Repository behavior has at least one integration test scaffold.
+
+### S9.3: Prepare Frontend Test Harness
+
+Status: `in-progress`
+
+As a frontend developer, I want component and E2E test commands so the review UI can be verified before shipping.
+
+Acceptance criteria:
+
+- Vitest and React Testing Library are configured.
+- Playwright is configured.
+- The current dashboard has at least one component test and one E2E smoke test.
+
+### S9.4: Add CI Quality Gate
+
+Status: `todo`
+
+As a maintainer, I want CI to run the default gate so regressions are caught before merge.
+
+Acceptance criteria:
+
+- CI installs Python and Node dependencies.
+- CI runs structure, backend unit, frontend lint/type-check, and frontend unit tests.
+- Integration tests are added as a separate job when Postgres is available.

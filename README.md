@@ -32,6 +32,9 @@ make dev-web
 Install dependencies first when you are ready to run services:
 
 ```sh
+brew install uv
+corepack enable
+corepack prepare pnpm@9.12.3 --activate
 pnpm install
 cd services/memory-engine && uv sync --extra dev
 ```
@@ -47,3 +50,15 @@ cd services/memory-engine && uv sync --extra dev
 ## Product Principle
 
 Build a durable memory compiler, not a summarizer. The important primitive is a typed, reviewable memory operation that can be traced, retried, audited, and rolled back.
+
+## Tests
+
+```sh
+make test-python-unit
+make test-python-integration
+make check-web
+make test-web-unit
+make test-web-e2e
+```
+
+Backend integration tests require Postgres from Docker Compose. See `docs/testing-strategy.md` for the full test matrix.

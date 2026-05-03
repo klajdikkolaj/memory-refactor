@@ -17,6 +17,7 @@ def memory_unit_from_record(record: MemoryUnitRecord) -> MemoryUnit:
             MemorySource(
                 source_type=source.source_type,
                 source_id=source.source_id,
+                raw_event_id=source.raw_event_id,
                 excerpt=source.excerpt,
                 url=source.url,
                 captured_at=source.captured_at,
@@ -43,6 +44,7 @@ def memory_unit_to_record(memory: MemoryUnit) -> MemoryUnitRecord:
             MemorySourceRecord(
                 source_type=source.source_type,
                 source_id=source.source_id,
+                raw_event_id=source.raw_event_id,
                 excerpt=source.excerpt,
                 url=source.url,
                 captured_at=source.captured_at,
@@ -67,6 +69,28 @@ async def list_memory_units(
     )
     result = await session.scalars(statement)
     return [memory_unit_from_record(record) for record in result]
+
+
+async def list_memory_units_by_ids(
+    session: AsyncSession,
+    memory_ids: list[str],
+) -> list[MemoryUnit]:
+    if not memory_ids:
+        return []
+
+    statement = (
+        select(MemoryUnitRecord)
+        .options(selectinload(MemoryUnitRecord.sources))
+        .where(MemoryUnitRecord.id.in_(memory_ids))
+    )
+    result = await session.scalars(statement)
+    records_by_id = {record.id: record for record in result}
+
+    return [
+        memory_unit_from_record(records_by_id[memory_id])
+        for memory_id in memory_ids
+        if memory_id in records_by_id
+    ]
 
 
 async def create_memory_unit(session: AsyncSession, memory: MemoryUnit) -> MemoryUnit:

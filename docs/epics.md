@@ -122,3 +122,17 @@ Success criteria:
 - Each future system has an adapter boundary.
 - Optional services do not block local MVP development.
 - Migration path is documented before adoption.
+
+## E9: Testing And Quality Gates
+
+Status: `in-progress`
+
+Create a test environment that covers backend units, backend integration, Temporal workflows, frontend components, browser E2E, and future CI gates.
+
+Success criteria:
+
+- Testing strategy is documented.
+- Backend unit and integration test commands exist.
+- Frontend unit and E2E test commands exist.
+- Runtime-dependent tests are gated so local unit tests stay fast.
+- CI can run the default quality gate without manual setup.

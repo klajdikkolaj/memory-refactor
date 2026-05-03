@@ -25,6 +25,26 @@ Good splits:
 - `debug-runtime`: use after a local app, worker, API, or Compose service fails to start or behaves incorrectly.
 - `verify-ui`: use after web UI changes. Browser verification is required when dependencies and runtime are available.
 
+## Repo-Specific Skills
+
+- `db-change`: database schema, SQLAlchemy, Alembic, repositories, and persistence tests.
+- `api-contract-change`: FastAPI routes, Pydantic request/response models, OpenAPI shape, and frontend contract impact.
+- `ui-change`: Next.js dashboard, React components, accessibility, component tests, and browser flows.
+- `test-gate`: maps changed files to required unit, integration, E2E, and structure checks.
+- `memory-operation-change`: protects typed memory operation, contradiction, versioning, review, and apply invariants.
+- `ship-change`: final repo-specific review/handoff gate.
+
+## Repo Agents
+
+Use `.codex/agents/*.toml` for repeated read-only reviewer roles:
+
+- `db_reviewer`: schema, migrations, repositories, and transaction risks.
+- `ui_verifier`: dashboard, accessibility selectors, component tests, and Playwright flows.
+- `test_gate_reviewer`: required checks for a diff and generated-artifact risk.
+- `architecture_synthesizer`: product boundaries, ports/adapters, Temporal rules, and deferred infra.
+
+Agents should call repo-local skills and docs instead of duplicating repo policy. Prefer read-only agents unless a future repeated implementation slice has a clear disjoint write scope.
+
 ## Research And Architecture Decisions
 
 - `research-to-decision`: use when outside information is needed to make a repo-grounded technical decision. Prefer official sources and end with a concrete recommendation.

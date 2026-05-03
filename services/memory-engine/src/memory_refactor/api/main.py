@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from memory_refactor.api.routes import health, memories, refactor_runs
+from memory_refactor.api.routes import health, memories, raw_memory_events, refactor_runs
 from memory_refactor.core.settings import get_settings
 
 
@@ -22,6 +22,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router)
+    app.include_router(raw_memory_events.router)
     app.include_router(memories.router)
     app.include_router(refactor_runs.router)
 

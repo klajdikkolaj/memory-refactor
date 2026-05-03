@@ -9,9 +9,9 @@ with workflow.unsafe.imports_passed_through():
 @workflow.defn
 class RefactorMemoryWorkflow:
     @workflow.run
-    async def run(self, memory_payloads: list[dict]) -> dict:
+    async def run(self, workflow_payload: dict) -> dict:
         return await workflow.execute_activity(
             create_refactor_plan,
-            memory_payloads,
+            workflow_payload,
             start_to_close_timeout=timedelta(minutes=5),
         )

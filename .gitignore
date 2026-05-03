@@ -35,3 +35,7 @@ coverage/
 tmp/
 logs/
 *.log
+playwright-report/
+test-results/
+apps/**/playwright-report/
+apps/**/test-results/

@@ -12,11 +12,19 @@ def _now() -> datetime:
 
 
 class MemoryKind(StrEnum):
+    PROFILE = "profile"
     FACT = "fact"
     PREFERENCE = "preference"
     GOAL = "goal"
     PROJECT = "project"
+    SKILL = "skill"
     RELATIONSHIP = "relationship"
+    DECISION = "decision"
+    HABIT = "habit"
+    CONSTRAINT = "constraint"
+    OPEN_QUESTION = "open_question"
+    CONTRADICTION = "contradiction"
+    SUMMARY = "summary"
     OBSERVATION = "observation"
 
 
@@ -44,11 +52,24 @@ class RefactorRunStatus(StrEnum):
     FAILED = "failed"
 
 
+class RawMemoryEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(default_factory=lambda: new_id("evt"))
+    source_type: str
+    source_id: str | None = None
+    content: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=_now)
+    processed_at: datetime | None = None
+
+
 class MemorySource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     source_type: str
     source_id: str
+    raw_event_id: str | None = None
     excerpt: str | None = None
     url: str | None = None
     captured_at: datetime = Field(default_factory=_now)
@@ -74,6 +95,7 @@ class MemoryOperation(BaseModel):
     id: str = Field(default_factory=lambda: new_id("op"))
     operation: OperationKind
     source_memory_ids: list[str] = Field(default_factory=list)
+    source_event_ids: list[str] = Field(default_factory=list)
     proposed_memory: MemoryUnit | None = None
     rationale: str = Field(min_length=1)
     confidence: float = Field(default=0.75, ge=0, le=1)
@@ -98,9 +120,17 @@ class RefactorPlan(BaseModel):
     run_id: str = Field(default_factory=lambda: new_id("run"))
     status: RefactorRunStatus = RefactorRunStatus.NEEDS_REVIEW
     summary: str = Field(min_length=1)
+    input_event_ids: list[str] = Field(default_factory=list)
     operations: list[MemoryOperation]
     contradictions: list[Contradiction] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=_now)
+
+
+class RefactorWorkflowInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str = Field(default_factory=lambda: new_id("run"))
+    raw_event_ids: list[str] = Field(min_length=1)
 
 
 class MemoryVersion(BaseModel):
