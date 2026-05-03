@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from memory_refactor.core.models import MemoryKind, MemoryUnit
@@ -15,6 +16,7 @@ async def test_create_and_list_memory_units_against_database() -> None:
     engine = create_engine()
 
     async with engine.begin() as connection:
+        await connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await connection.run_sync(Base.metadata.drop_all)
         await connection.run_sync(Base.metadata.create_all)
 

@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from dataclasses import dataclass
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,16 +8,66 @@ from sqlalchemy.orm import selectinload
 from memory_refactor.core.models import (
     Contradiction,
     MemoryOperation,
+    OperationKind,
+    OperationReviewStatus,
     MemoryUnit,
     RefactorPlan,
     RefactorRunStatus,
 )
+from memory_refactor.db.repositories.memory_units import memory_unit_to_record
 from memory_refactor.db.tables import (
     ContradictionRecord,
     MemoryOperationRecord,
+    MemoryUnitRecord,
+    MemoryVersionRecord,
     RefactorRunRecord,
     RawMemoryEventRecord,
 )
+
+
+@dataclass(frozen=True)
+class ApplyMemoryOperationResult:
+    operation: MemoryOperation
+    memory: MemoryUnit
+
+
+class ApplyMemoryOperationError(Exception):
+    message = "Unable to apply approved memory operation"
+
+    def __init__(self, message: str | None = None) -> None:
+        super().__init__(message or self.message)
+
+
+class RefactorRunNotFoundError(ApplyMemoryOperationError):
+    message = "Refactor run not found"
+
+
+class RefactorRunNotReviewableError(ApplyMemoryOperationError):
+    message = "Refactor run is not awaiting review"
+
+
+class MemoryOperationNotFoundError(ApplyMemoryOperationError):
+    message = "Memory operation not found"
+
+
+class MemoryOperationNotApprovedError(ApplyMemoryOperationError):
+    message = "Memory operation is not approved"
+
+
+class UnsupportedApprovedMemoryOperationError(ApplyMemoryOperationError):
+    message = "Only approved create_memory operations can be applied in the MVP"
+
+
+class InvalidApprovedMemoryOperationError(ApplyMemoryOperationError):
+    message = "Approved memory operation is missing a proposed memory"
+
+
+class MissingSourceEvidenceError(ApplyMemoryOperationError):
+    message = "Approved memory operation references missing source evidence"
+
+
+class ProposedMemoryAlreadyExistsError(ApplyMemoryOperationError):
+    message = "Proposed memory already exists"
 
 
 def _operation_from_record(record: MemoryOperationRecord) -> MemoryOperation:
@@ -33,6 +84,7 @@ def _operation_from_record(record: MemoryOperationRecord) -> MemoryOperation:
         rationale=record.rationale,
         confidence=record.confidence,
         requires_human_review=record.requires_human_review,
+        review_status=record.review_status or OperationReviewStatus.NEEDS_REVIEW,
         metadata=record.extra,
     )
 
@@ -53,6 +105,7 @@ def _operation_to_record(operation: MemoryOperation, *, run_id: str, position: i
         rationale=operation.rationale,
         confidence=operation.confidence,
         requires_human_review=operation.requires_human_review,
+        review_status=operation.review_status.value,
         extra=operation.metadata,
     )
 
@@ -307,3 +360,166 @@ async def update_refactor_run_status(
             record.workflow_id = workflow_id
 
     return await get_refactor_plan(session, run_id)
+
+
+async def update_memory_operation_review_status(
+    session: AsyncSession,
+    *,
+    run_id: str,
+    operation_id: str,
+    review_status: OperationReviewStatus,
+) -> MemoryOperation | None:
+    async with session.begin():
+        result = await session.scalars(
+            select(MemoryOperationRecord).where(
+                MemoryOperationRecord.refactor_run_id == run_id,
+                MemoryOperationRecord.id == operation_id,
+            )
+        )
+        record = result.one_or_none()
+
+        if record is None:
+            return None
+
+        record.review_status = review_status.value
+        await session.flush()
+
+        return _operation_from_record(record)
+
+
+async def apply_approved_create_memory_operation(
+    session: AsyncSession,
+    *,
+    run_id: str,
+    operation_id: str,
+) -> ApplyMemoryOperationResult:
+    async with session.begin():
+        result = await session.scalars(
+            select(RefactorRunRecord)
+            .options(*_refactor_plan_load_options())
+            .where(RefactorRunRecord.id == run_id)
+            .with_for_update()
+        )
+        run_record = result.one_or_none()
+
+        if run_record is None:
+            raise RefactorRunNotFoundError()
+
+        if run_record.status != RefactorRunStatus.NEEDS_REVIEW.value:
+            raise RefactorRunNotReviewableError()
+
+        result = await session.scalars(
+            select(MemoryOperationRecord)
+            .where(
+                MemoryOperationRecord.refactor_run_id == run_id,
+                MemoryOperationRecord.id == operation_id,
+            )
+            .with_for_update()
+        )
+        operation_record = result.one_or_none()
+
+        if operation_record is None:
+            raise MemoryOperationNotFoundError()
+
+        if operation_record.review_status != OperationReviewStatus.APPROVED.value:
+            raise MemoryOperationNotApprovedError()
+
+        if operation_record.operation != OperationKind.CREATE_MEMORY.value:
+            raise UnsupportedApprovedMemoryOperationError()
+
+        proposed_memory = _proposed_memory_for_approved_operation(operation_record)
+        await _validate_source_evidence(session, operation_record, proposed_memory)
+        await _validate_proposed_memory_does_not_exist(session, proposed_memory)
+
+        session.add(memory_unit_to_record(proposed_memory))
+        session.add(
+            MemoryVersionRecord(
+                memory_id=proposed_memory.id,
+                version=1,
+                snapshot=proposed_memory.model_dump(mode="json"),
+                operation_id=operation_record.id,
+            )
+        )
+        operation_record.review_status = OperationReviewStatus.APPLIED.value
+
+        operations = sorted(run_record.operations, key=lambda operation: operation.position)
+        if all(
+            operation.review_status
+            in {OperationReviewStatus.APPLIED.value, OperationReviewStatus.REJECTED.value}
+            for operation in operations
+        ):
+            run_record.status = RefactorRunStatus.APPLIED.value
+
+        await session.flush()
+
+    operation = await get_memory_operation(session, run_id=run_id, operation_id=operation_id)
+    if operation is None:
+        raise RuntimeError(f"Applied memory operation {operation_id} could not be loaded")
+
+    return ApplyMemoryOperationResult(
+        operation=operation,
+        memory=proposed_memory,
+    )
+
+
+async def get_memory_operation(
+    session: AsyncSession,
+    *,
+    run_id: str,
+    operation_id: str,
+) -> MemoryOperation | None:
+    result = await session.scalars(
+        select(MemoryOperationRecord).where(
+            MemoryOperationRecord.refactor_run_id == run_id,
+            MemoryOperationRecord.id == operation_id,
+        )
+    )
+    record = result.one_or_none()
+
+    if record is None:
+        return None
+
+    return _operation_from_record(record)
+
+
+def _proposed_memory_for_approved_operation(operation: MemoryOperationRecord) -> MemoryUnit:
+    if operation.proposed_memory is None:
+        raise InvalidApprovedMemoryOperationError()
+
+    return MemoryUnit.model_validate(operation.proposed_memory)
+
+
+async def _validate_source_evidence(
+    session: AsyncSession,
+    operation: MemoryOperationRecord,
+    memory: MemoryUnit,
+) -> None:
+    source_event_ids = set(operation.source_event_ids)
+    source_event_ids.update(
+        source.raw_event_id for source in memory.sources if source.raw_event_id is not None
+    )
+
+    if not source_event_ids:
+        raise MissingSourceEvidenceError("Approved create_memory operation needs source events")
+
+    existing_source_event_ids = set(
+        await session.scalars(
+            select(RawMemoryEventRecord.id).where(RawMemoryEventRecord.id.in_(source_event_ids))
+        )
+    )
+    missing_source_event_ids = sorted(source_event_ids - existing_source_event_ids)
+    if missing_source_event_ids:
+        raise MissingSourceEvidenceError(
+            f"Source evidence not found: {', '.join(missing_source_event_ids)}"
+        )
+
+
+async def _validate_proposed_memory_does_not_exist(
+    session: AsyncSession,
+    memory: MemoryUnit,
+) -> None:
+    existing_memory_id = await session.scalar(
+        select(MemoryUnitRecord.id).where(MemoryUnitRecord.id == memory.id)
+    )
+    if existing_memory_id is not None:
+        raise ProposedMemoryAlreadyExistsError(f"Proposed memory already exists: {memory.id}")

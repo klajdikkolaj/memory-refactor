@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -16,8 +16,15 @@ import {
   ShieldCheck,
   Workflow,
 } from "lucide-react";
-import { memoryOperations, refactorRuns, timeline } from "@/lib/sample-data";
-import type { MemoryOperation, RefactorStatus } from "@/lib/types";
+import { applyMemoryOperation, reviewMemoryOperation } from "@/lib/refactor-runs";
+import { memoryOperations, refactorRuns as sampleRefactorRuns, timeline } from "@/lib/sample-data";
+import type {
+  MemoryOperation,
+  OperationReviewDecision,
+  RefactorRun,
+  RefactorRunDataSource,
+  RefactorStatus,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Filter = "all" | RefactorStatus;
@@ -41,27 +48,162 @@ const operationIcons: Record<MemoryOperation["type"], typeof GitMerge> = {
   supersede: Layers3,
   archive: FileText,
   flag_contradiction: AlertTriangle,
+  create_memory: FileText,
+  merge_memories: GitMerge,
+  split_memory: Layers3,
+  supersede_memory: Layers3,
+  archive_memory: FileText,
+  mark_contradiction: AlertTriangle,
 };
 
-export function MemoryWorkbench() {
-  const [selectedRunId, setSelectedRunId] = useState(refactorRuns[0].id);
+const sampleOperationsByRunId = Object.fromEntries(
+  sampleRefactorRuns.map((run) => [run.id, memoryOperations]),
+);
+
+type MemoryWorkbenchProps = {
+  refactorRuns?: RefactorRun[];
+  operationsByRunId?: Record<string, MemoryOperation[]>;
+  runDataSource?: RefactorRunDataSource;
+  runDataError?: string | null;
+};
+
+export function MemoryWorkbench({
+  refactorRuns = sampleRefactorRuns,
+  operationsByRunId = sampleOperationsByRunId,
+  runDataSource = "sample",
+  runDataError = null,
+}: MemoryWorkbenchProps) {
+  const [selectedRunId, setSelectedRunId] = useState(refactorRuns[0]?.id ?? "");
   const [filter, setFilter] = useState<Filter>("all");
-  const [selectedOperationId, setSelectedOperationId] = useState(memoryOperations[0].id);
+  const [selectedOperationId, setSelectedOperationId] = useState("");
+  const [operationsStateByRunId, setOperationsStateByRunId] = useState(operationsByRunId);
+  const [reviewingOperationId, setReviewingOperationId] = useState<string | null>(null);
+  const [applyingOperationId, setApplyingOperationId] = useState<string | null>(null);
+  const [reviewError, setReviewError] = useState<string | null>(null);
+  const [applyError, setApplyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (refactorRuns.length === 0) {
+      setSelectedRunId("");
+      return;
+    }
+
+    if (!refactorRuns.some((run) => run.id === selectedRunId)) {
+      setSelectedRunId(refactorRuns[0].id);
+    }
+  }, [refactorRuns, selectedRunId]);
+
+  useEffect(() => {
+    setOperationsStateByRunId(operationsByRunId);
+  }, [operationsByRunId]);
 
   const selectedRun = refactorRuns.find((run) => run.id === selectedRunId) ?? refactorRuns[0];
 
-  const visibleOperations = useMemo(() => {
-    if (filter === "all") {
-      return memoryOperations;
+  const selectedRunOperations = useMemo(() => {
+    if (!selectedRun) {
+      return [];
     }
 
-    return memoryOperations.filter((operation) => operation.status === filter);
-  }, [filter]);
+    return operationsStateByRunId[selectedRun.id] ?? [];
+  }, [operationsStateByRunId, selectedRun]);
+
+  const visibleOperations = useMemo(() => {
+    if (filter === "all") {
+      return selectedRunOperations;
+    }
+
+    return selectedRunOperations.filter((operation) => operation.status === filter);
+  }, [filter, selectedRunOperations]);
+
+  useEffect(() => {
+    if (visibleOperations.length === 0) {
+      setSelectedOperationId("");
+      return;
+    }
+
+    if (!visibleOperations.some((operation) => operation.id === selectedOperationId)) {
+      setSelectedOperationId(visibleOperations[0].id);
+    }
+  }, [selectedOperationId, visibleOperations]);
 
   const selectedOperation =
-    memoryOperations.find((operation) => operation.id === selectedOperationId) ??
-    visibleOperations[0] ??
-    memoryOperations[0];
+    visibleOperations.find((operation) => operation.id === selectedOperationId) ??
+    visibleOperations[0];
+
+  useEffect(() => {
+    setReviewError(null);
+    setApplyError(null);
+  }, [selectedOperationId, selectedRunId]);
+
+  const canPersistReview = runDataSource === "api" && selectedRun?.status === "review";
+  const reviewInFlight = reviewingOperationId === selectedOperation?.id;
+  const applyInFlight = applyingOperationId === selectedOperation?.id;
+  const operationApplySupported = selectedOperation?.type === "create_memory";
+  const canApplySelectedOperation =
+    canPersistReview &&
+    selectedOperation?.reviewStatus === "approved" &&
+    operationApplySupported;
+
+  function replaceSelectedRunOperation(updatedOperation: MemoryOperation) {
+    if (!selectedRun) {
+      return;
+    }
+
+    setOperationsStateByRunId((current) => ({
+      ...current,
+      [selectedRun.id]: (current[selectedRun.id] ?? []).map((operation) =>
+        operation.id === updatedOperation.id ? updatedOperation : operation,
+      ),
+    }));
+    setSelectedOperationId(updatedOperation.id);
+  }
+
+  async function handleReviewOperation(decision: OperationReviewDecision) {
+    if (!selectedRun || !selectedOperation || !canPersistReview) {
+      return;
+    }
+
+    setReviewingOperationId(selectedOperation.id);
+    setReviewError(null);
+
+    try {
+      const updatedOperation = await reviewMemoryOperation({
+        runId: selectedRun.id,
+        operationId: selectedOperation.id,
+        decision,
+      });
+
+      replaceSelectedRunOperation(updatedOperation);
+    } catch (error) {
+      setReviewError(
+        error instanceof Error ? error.message : "Unable to persist review decision",
+      );
+    } finally {
+      setReviewingOperationId(null);
+    }
+  }
+
+  async function handleApplyOperation() {
+    if (!selectedRun || !selectedOperation || !canApplySelectedOperation) {
+      return;
+    }
+
+    setApplyingOperationId(selectedOperation.id);
+    setApplyError(null);
+
+    try {
+      const updatedOperation = await applyMemoryOperation({
+        runId: selectedRun.id,
+        operationId: selectedOperation.id,
+      });
+
+      replaceSelectedRunOperation(updatedOperation);
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : "Unable to apply operation");
+    } finally {
+      setApplyingOperationId(null);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-paper text-ink">
@@ -119,6 +261,11 @@ export function MemoryWorkbench() {
               <p className="mt-1 max-w-2xl text-sm leading-6 text-zinc-600">
                 Review typed memory operations before they become canonical state.
               </p>
+              <p className="mt-1 text-xs text-zinc-500">
+                {runDataSource === "api"
+                  ? "Refactor runs loaded from FastAPI."
+                  : `Showing sample refactor runs${runDataError ? `: ${runDataError}` : "."}`}
+              </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -145,30 +292,36 @@ export function MemoryWorkbench() {
                 <p className="text-sm font-semibold">Refactor runs</p>
               </div>
               <div className="divide-y divide-line">
-                {refactorRuns.map((run) => (
-                  <button
-                    key={run.id}
-                    className={cn(
-                      "grid w-full gap-3 px-4 py-4 text-left transition hover:bg-zinc-50",
-                      selectedRunId === run.id && "bg-zinc-50",
-                    )}
-                    onClick={() => setSelectedRunId(run.id)}
-                    type="button"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-medium">{run.title}</p>
-                        <p className="mt-1 text-xs text-zinc-500">{run.startedAt}</p>
+                {refactorRuns.length === 0 ? (
+                  <div className="px-4 py-8 text-sm text-zinc-600">
+                    No refactor runs yet. Paste raw memory and start a refactor to create one.
+                  </div>
+                ) : (
+                  refactorRuns.map((run) => (
+                    <button
+                      key={run.id}
+                      className={cn(
+                        "grid w-full gap-3 px-4 py-4 text-left transition hover:bg-zinc-50",
+                        selectedRunId === run.id && "bg-zinc-50",
+                      )}
+                      onClick={() => setSelectedRunId(run.id)}
+                      type="button"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{run.title}</p>
+                          <p className="mt-1 text-xs text-zinc-500">{run.startedAt}</p>
+                        </div>
+                        <StatusBadge status={run.status} />
                       </div>
-                      <StatusBadge status={run.status} />
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs text-zinc-600">
-                      <Metric label="Sources" value={run.sourceCount.toString()} />
-                      <Metric label="Ops" value={run.operationCount.toString()} />
-                      <Metric label="Conf." value={`${Math.round(run.confidence * 100)}%`} />
-                    </div>
-                  </button>
-                ))}
+                      <div className="grid grid-cols-3 gap-2 text-xs text-zinc-600">
+                        <Metric label="Sources" value={run.sourceCount.toString()} />
+                        <Metric label="Ops" value={run.operationCount.toString()} />
+                        <Metric label="Conf." value={`${Math.round(run.confidence * 100)}%`} />
+                      </div>
+                    </button>
+                  ))
+                )}
               </div>
             </section>
 
@@ -176,7 +329,9 @@ export function MemoryWorkbench() {
               <div className="flex flex-col gap-3 border-b border-line px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold">Proposed operations</p>
-                  <p className="mt-1 text-xs text-zinc-500">{selectedRun.title}</p>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    {selectedRun?.title ?? "Select a refactor run"}
+                  </p>
                 </div>
                 <div className="flex rounded-lg border border-line bg-zinc-50 p-1">
                   {filterOptions.map((option) => (
@@ -196,42 +351,50 @@ export function MemoryWorkbench() {
               </div>
 
               <div className="divide-y divide-line">
-                {visibleOperations.map((operation) => {
-                  const Icon = operationIcons[operation.type];
+                {visibleOperations.length === 0 ? (
+                  <div className="px-4 py-8 text-sm text-zinc-600">
+                    No operations match this view yet.
+                  </div>
+                ) : (
+                  visibleOperations.map((operation) => {
+                    const Icon = operationIcons[operation.type];
 
-                  return (
-                    <button
-                      key={operation.id}
-                      className={cn(
-                        "grid w-full gap-3 px-4 py-4 text-left transition hover:bg-zinc-50",
-                        selectedOperation.id === operation.id && "bg-zinc-50",
-                      )}
-                      onClick={() => setSelectedOperationId(operation.id)}
-                      type="button"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-white text-zinc-700">
-                          <Icon className="h-4 w-4" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-sm font-medium">{operation.title}</p>
-                            <StatusBadge status={operation.status} />
+                    return (
+                      <button
+                        key={operation.id}
+                        className={cn(
+                          "grid w-full gap-3 px-4 py-4 text-left transition hover:bg-zinc-50",
+                          selectedOperation?.id === operation.id && "bg-zinc-50",
+                        )}
+                        onClick={() => setSelectedOperationId(operation.id)}
+                        type="button"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-white text-zinc-700">
+                            <Icon className="h-4 w-4" aria-hidden="true" />
                           </div>
-                          <p className="mt-1 text-sm leading-6 text-zinc-600">{operation.detail}</p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-medium">{operation.title}</p>
+                              <StatusBadge status={operation.status} />
+                            </div>
+                            <p className="mt-1 text-sm leading-6 text-zinc-600">
+                              {operation.detail}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 pl-11 text-xs text-zinc-500">
-                        {operation.sources.map((source) => (
-                          <span key={source} className="rounded-md border border-line px-2 py-1">
-                            {source}
-                          </span>
-                        ))}
-                        <span>{Math.round(operation.confidence * 100)}% confidence</span>
-                      </div>
-                    </button>
-                  );
-                })}
+                        <div className="flex flex-wrap items-center gap-2 pl-11 text-xs text-zinc-500">
+                          {operation.sources.map((source) => (
+                            <span key={source} className="rounded-md border border-line px-2 py-1">
+                              {source}
+                            </span>
+                          ))}
+                          <span>{Math.round(operation.confidence * 100)}% confidence</span>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
               </div>
             </section>
           </div>
@@ -260,54 +423,168 @@ export function MemoryWorkbench() {
         </section>
 
         <aside className="border-t border-line bg-white px-5 py-5 lg:border-l lg:border-t-0">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold">Operation detail</p>
-              <p className="mt-1 text-xs text-zinc-500">{selectedOperation.id}</p>
-            </div>
-            <StatusBadge status={selectedOperation.status} />
-          </div>
+          {selectedOperation ? (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Operation detail</p>
+                  <p className="mt-1 text-xs text-zinc-500">{selectedOperation.id}</p>
+                </div>
+                <StatusBadge status={selectedOperation.status} />
+              </div>
 
-          <div className="mt-5 rounded-lg border border-line p-4">
-            <p className="text-xs font-medium uppercase text-zinc-500">Proposal</p>
-            <h2 className="mt-2 text-lg font-semibold">{selectedOperation.title}</h2>
-            <p className="mt-3 text-sm leading-6 text-zinc-600">{selectedOperation.detail}</p>
-          </div>
+              <div className="mt-5 rounded-lg border border-line p-4">
+                <p className="text-xs font-medium uppercase text-zinc-500">Proposal</p>
+                <h2 className="mt-2 text-lg font-semibold">{selectedOperation.title}</h2>
+                <p className="mt-3 text-sm leading-6 text-zinc-600">{selectedOperation.detail}</p>
+              </div>
 
-          <div className="mt-4 rounded-lg border border-line p-4">
-            <p className="text-xs font-medium uppercase text-zinc-500">Sources</p>
-            <div className="mt-3 grid gap-2">
-              {selectedOperation.sources.map((source) => (
+              <div className="mt-4 rounded-lg border border-line p-4">
+                <p className="text-xs font-medium uppercase text-zinc-500">Rationale</p>
+                <p className="mt-3 text-sm leading-6 text-zinc-600">
+                  {selectedOperation.rationale}
+                </p>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-line p-4">
+                <p className="text-xs font-medium uppercase text-zinc-500">Review state</p>
+                <p className="mt-3 text-sm font-medium text-zinc-800">
+                  {formatReviewStatus(selectedOperation.reviewStatus)}
+                </p>
+                {runDataSource !== "api" ? (
+                  <p className="mt-2 text-xs leading-5 text-zinc-500">
+                    API-backed runs are required to persist review decisions.
+                  </p>
+                ) : null}
+                {selectedRun?.status !== "review" ? (
+                  <p className="mt-2 text-xs leading-5 text-zinc-500">
+                    This refactor run is not awaiting review.
+                  </p>
+                ) : null}
+                {selectedOperation.reviewStatus === "approved" && !operationApplySupported ? (
+                  <p className="mt-2 text-xs leading-5 text-zinc-500">
+                    Only create_memory operations can be applied in this MVP.
+                  </p>
+                ) : null}
+                {reviewError ? (
+                  <p className="mt-2 text-xs leading-5 text-flame" role="alert">
+                    {reviewError}
+                  </p>
+                ) : null}
+                {applyError ? (
+                  <p className="mt-2 text-xs leading-5 text-flame" role="alert">
+                    {applyError}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="mt-4 rounded-lg border border-line p-4">
+                <p className="text-xs font-medium uppercase text-zinc-500">Sources</p>
+                <div className="mt-3 grid gap-2">
+                  {selectedOperation.sourceDetails.map((source) => (
+                    <div key={source.id} className="rounded-lg border border-line px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>{source.label}</span>
+                        <FileText className="h-4 w-4 text-zinc-400" aria-hidden="true" />
+                      </div>
+                      {source.excerpt ? (
+                        <p className="mt-2 text-xs leading-5 text-zinc-500">{source.excerpt}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
                 <button
-                  key={source}
-                  className="flex h-10 items-center justify-between rounded-lg border border-line px-3 text-left text-sm transition hover:border-zinc-300"
+                  className="h-10 rounded-lg border border-line bg-white text-sm font-medium text-zinc-700 transition hover:border-zinc-300 disabled:cursor-not-allowed disabled:opacity-55"
+                  disabled={
+                    !canPersistReview ||
+                    reviewInFlight ||
+                    applyInFlight ||
+                    selectedOperation.reviewStatus === "rejected" ||
+                    selectedOperation.reviewStatus === "applied"
+                  }
+                  onClick={() => void handleReviewOperation("rejected")}
                   type="button"
                 >
-                  <span>{source}</span>
-                  <FileText className="h-4 w-4 text-zinc-400" aria-hidden="true" />
+                  {selectedOperation.reviewStatus === "rejected" ? "Rejected" : "Reject"}
                 </button>
-              ))}
-            </div>
-          </div>
+                <button
+                  className="h-10 rounded-lg bg-moss text-sm font-medium text-white transition hover:bg-[#285f43] disabled:cursor-not-allowed disabled:opacity-55"
+                  disabled={isPrimaryActionDisabled({
+                    applyInFlight,
+                    canApplySelectedOperation,
+                    canPersistReview,
+                    reviewInFlight,
+                    reviewStatus: selectedOperation.reviewStatus,
+                  })}
+                  onClick={() => {
+                    if (selectedOperation.reviewStatus === "approved") {
+                      void handleApplyOperation();
+                      return;
+                    }
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <button
-              className="h-10 rounded-lg border border-line bg-white text-sm font-medium text-zinc-700 transition hover:border-zinc-300"
-              type="button"
-            >
-              Reject
-            </button>
-            <button
-              className="h-10 rounded-lg bg-moss text-sm font-medium text-white transition hover:bg-[#285f43]"
-              type="button"
-            >
-              Approve
-            </button>
-          </div>
+                    void handleReviewOperation("approved");
+                  }}
+                  type="button"
+                >
+                  {primaryActionLabel(selectedOperation.reviewStatus, applyInFlight)}
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-lg border border-line p-4 text-sm text-zinc-600">
+              Select a run operation to inspect its Memory PR detail.
+            </div>
+          )}
         </aside>
       </div>
     </main>
   );
+}
+
+function formatReviewStatus(status: MemoryOperation["reviewStatus"]) {
+  return status.replace("_", " ");
+}
+
+function primaryActionLabel(
+  reviewStatus: MemoryOperation["reviewStatus"],
+  applyInFlight: boolean,
+) {
+  if (reviewStatus === "applied") {
+    return "Applied";
+  }
+
+  if (reviewStatus === "approved") {
+    return applyInFlight ? "Applying" : "Apply";
+  }
+
+  return "Approve";
+}
+
+function isPrimaryActionDisabled({
+  applyInFlight,
+  canApplySelectedOperation,
+  canPersistReview,
+  reviewInFlight,
+  reviewStatus,
+}: {
+  applyInFlight: boolean;
+  canApplySelectedOperation: boolean;
+  canPersistReview: boolean;
+  reviewInFlight: boolean;
+  reviewStatus: MemoryOperation["reviewStatus"];
+}) {
+  if (reviewStatus === "applied" || reviewStatus === "rejected") {
+    return true;
+  }
+
+  if (reviewStatus === "approved") {
+    return !canApplySelectedOperation || applyInFlight || reviewInFlight;
+  }
+
+  return !canPersistReview || applyInFlight || reviewInFlight;
 }
 
 function StatusBadge({ status }: { status: RefactorStatus }) {

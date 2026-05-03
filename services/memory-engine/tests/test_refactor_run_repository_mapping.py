@@ -7,6 +7,7 @@ from memory_refactor.core.models import (
     MemorySource,
     MemoryUnit,
     OperationKind,
+    OperationReviewStatus,
     RefactorPlan,
     RefactorRunStatus,
 )
@@ -44,6 +45,7 @@ def test_refactor_plan_record_mapping_round_trips_contract_fields() -> None:
         proposed_memory=proposed_memory,
         rationale="The source memories describe complementary stack choices.",
         confidence=0.9,
+        review_status=OperationReviewStatus.APPROVED,
         metadata={"planner": "seed"},
     )
     contradiction = Contradiction(
@@ -72,11 +74,13 @@ def test_refactor_plan_record_mapping_round_trips_contract_fields() -> None:
     assert record.input_event_ids == ["evt_ts", "evt_python"]
     assert record.operations[0].position == 0
     assert record.operations[0].source_event_ids == ["evt_ts", "evt_python"]
+    assert record.operations[0].review_status == "approved"
     assert mapped.id == "plan_stack"
     assert mapped.run_id == "run_stack"
     assert mapped.input_event_ids == ["evt_ts", "evt_python"]
     assert mapped.status is RefactorRunStatus.NEEDS_REVIEW
     assert mapped.operations[0].operation is OperationKind.MERGE_MEMORIES
     assert mapped.operations[0].source_event_ids == ["evt_ts", "evt_python"]
+    assert mapped.operations[0].review_status is OperationReviewStatus.APPROVED
     assert mapped.operations[0].proposed_memory == proposed_memory
     assert mapped.contradictions[0].proposed_resolution == operation

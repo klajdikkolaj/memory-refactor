@@ -23,6 +23,7 @@ Priority legend:
 | T0.1 | S0.1 | P0 | done | Create monorepo scaffold | Added web, memory-engine, infra, docs. |
 | T0.2 | S0.2 | P0 | done | Add repo-local Codex operating context | Added `AGENTS.md`, context docs, and baseline skills. |
 | T0.3 | S0.3 | P0 | done | Add epics, stories, and task tracking docs | Created `docs/epics.md`, `docs/stories.md`, and `docs/tasks.md`. |
+| T0.6 | S0.3 | P0 | done | Add product-readable architecture docs | Added product vision, MVP flow, data model, and expanded architecture docs. |
 | T1.1 | S1.1 | P0 | done | Add initial Pydantic memory/refactor models | Models exist in `services/memory-engine/src/memory_refactor/core/models.py`. |
 | T1.2 | S1.1 | P0 | done | Add deterministic seed refactor planner | Stub exists in `core/operations.py`. |
 | T1.3 | S1.2 | P0 | done | Add SQLAlchemy database session and base model | Added async session helpers, declarative base, and initial ORM records. |
@@ -30,13 +31,14 @@ Priority legend:
 | T1.5 | S1.2 | P0 | done | Implement memory create/list endpoints backed by Postgres | Replaced seeded `/memories` response with async DB-backed create/list handlers. |
 | T1.6 | S1.3 | P0 | done | Persist refactor runs and operations | Preview endpoint now persists a run, operations, and contradictions. |
 | T5.1 | S5.1 | P0 | done | Add API endpoint to start Temporal refactor workflow | `POST /refactor-runs` now accepts `raw_event_ids`, returns run/workflow identifiers, and stores a run shell. |
-| T6.1 | S6.1 | P0 | todo | Fetch refactor runs from API in web app | Replace sample run data after raw-event MVP path is visible. |
-| T6.2 | S6.2 | P0 | todo | Fetch operation detail and source excerpts from API | Replace sample operation data. |
-| T6.3 | S6.3 | P0 | todo | Wire approve/reject buttons to API | Keep local optimistic state simple. |
+| T5.2 | S5.2 | P0 | done | Apply approved operations transactionally | `create_memory` operations now write canonical memory, version `1`, and `applied` state. |
+| T6.1 | S6.1 | P0 | done | Fetch refactor runs from API in web app | Dashboard run list now maps `GET /refactor-runs` with sample fallback. |
+| T6.2 | S6.2 | P0 | done | Fetch operation detail and source excerpts from API | Selected run operations now map from `RefactorPlan.operations` with source excerpts. |
+| T6.3 | S6.3 | P0 | done | Wire approve/reject buttons to API | Review decisions persist on memory operations. |
 | T2.1 | S2.1 | P0 | done | Add raw memory event model and endpoint | Added append-only raw event contract, table, repository, and API route. |
-| T2.2 | S2.1 | P0 | todo | Add manual raw memory batch ingestion flow | Accept pasted messy memory and create raw events for a refactor run. |
-| T3.1 | S3.1 | P1 | todo | Add pgvector embedding persistence | Start with adapter interface plus Postgres implementation. |
-| T3.2 | S3.2 | P1 | todo | Add Postgres relationship table for graph-like MVP | Include temporal validity fields. |
+| T2.2 | S2.1 | P0 | done | Add manual raw memory batch ingestion flow | `POST /raw-memory-events/manual-batches` creates raw events and starts a refactor run. |
+| T3.1 | S3.1 | P1 | done | Add pgvector embedding persistence | Added typed embedding contracts, `memory_embeddings`, and Postgres nearest-neighbor repository. |
+| T3.2 | S3.2 | P1 | done | Add Postgres relationship table for graph-like MVP | Added temporal relationship contract, table, and Postgres memory graph repository. |
 | T4.1 | S4.2 | P1 | todo | Add Pydantic AI agent wrapper behind `RefactorAgent` port | Keep deterministic stub as fallback. |
 | T7.1 | S7.1 | P1 | todo | Add trace ID fields to refactor runs | Integration can be no-op locally. |
 | T7.2 | S7.2 | P2 | todo | Store review decisions for eval data | Useful after review UI is real. |
@@ -51,15 +53,16 @@ Priority legend:
 
 ## Current Next Slice
 
-Recommended next implementation task: `T2.2`.
+Recommended next implementation task: `T4.1`.
 
-Reason: the backend now supports raw events and workflow starts from `raw_event_ids`. The next blocker for the intended MVP demo is a manual pasted-memory batch flow that creates raw events and starts a Memory PR run from them.
+Reason: semantic and relationship retrieval persistence now exist behind local adapters. The next agent gap is replacing the deterministic-only planner path with a Pydantic AI wrapper while keeping the stub as fallback.
 
 ## Recently Completed
 
 - `T0.1`: Monorepo scaffold.
 - `T0.2`: Codex operating context.
 - `T0.3`: Epics, stories, and tasks docs.
+- `T0.6`: Product vision, MVP flow, data model, and expanded architecture docs.
 - `T1.1`: Initial memory contracts.
 - `T1.2`: Deterministic planner stub.
 - `T1.3`: SQLAlchemy database base and session helpers.
@@ -67,7 +70,14 @@ Reason: the backend now supports raw events and workflow starts from `raw_event_
 - `T1.5`: Database-backed memory create/list endpoints.
 - `T1.6`: Refactor preview persistence with run/operation repository and API list/detail endpoints.
 - `T5.1`: Temporal workflow start endpoint with typed raw-event input and persisted workflow output path.
+- `T5.2`: Transactional apply endpoint for approved `create_memory` operations with immutable version write.
+- `T6.1`: API-backed refactor run list in the web dashboard.
+- `T6.2`: API-backed operation detail and source excerpt rendering.
+- `T6.3`: API-backed approve/reject review state for Memory PR operations.
 - `T2.1`: Raw memory event contract, persistence, API, and refactor-run evidence wiring.
+- `T2.2`: Manual pasted-memory batch endpoint that creates raw events and starts a refactor run.
+- `T3.1`: pgvector-backed memory embedding persistence and nearest-neighbor retrieval adapter.
+- `T3.2`: Postgres-backed temporal relationship persistence and retrieval adapter.
 - `T9.1`: Testing strategy.
 - `T9.2`: Backend test harness.
 - `T9.3`: Frontend test harness.

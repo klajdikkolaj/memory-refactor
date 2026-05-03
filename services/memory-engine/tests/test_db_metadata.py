@@ -7,6 +7,8 @@ def test_database_metadata_contains_initial_tables() -> None:
         "memory_units",
         "raw_memory_events",
         "memory_sources",
+        "memory_embeddings",
+        "memory_relationships",
         "refactor_runs",
         "memory_operations",
         "memory_versions",

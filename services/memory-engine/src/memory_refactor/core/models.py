@@ -1,8 +1,9 @@
 from datetime import datetime, timezone
 from enum import StrEnum
+from math import isfinite
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from memory_refactor.core.ids import new_id
 
@@ -50,6 +51,13 @@ class RefactorRunStatus(StrEnum):
     NEEDS_REVIEW = "needs_review"
     APPLIED = "applied"
     FAILED = "failed"
+
+
+class OperationReviewStatus(StrEnum):
+    NEEDS_REVIEW = "needs_review"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    APPLIED = "applied"
 
 
 class RawMemoryEvent(BaseModel):
@@ -100,6 +108,7 @@ class MemoryOperation(BaseModel):
     rationale: str = Field(min_length=1)
     confidence: float = Field(default=0.75, ge=0, le=1)
     requires_human_review: bool = True
+    review_status: OperationReviewStatus = OperationReviewStatus.NEEDS_REVIEW
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -142,3 +151,66 @@ class MemoryVersion(BaseModel):
     snapshot: MemoryUnit
     operation_id: str | None = None
     created_at: datetime = Field(default_factory=_now)
+
+
+class EmbeddingVector(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    values: list[float] = Field(min_length=1)
+
+    @field_validator("values")
+    @classmethod
+    def validate_finite_values(cls, values: list[float]) -> list[float]:
+        if any(not isfinite(value) for value in values):
+            raise ValueError("embedding values must be finite")
+        return values
+
+    @property
+    def dimensions(self) -> int:
+        return len(self.values)
+
+
+class MemoryEmbedding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(default_factory=lambda: new_id("emb"))
+    memory_id: str = Field(min_length=1)
+    embedding_model: str = Field(min_length=1, max_length=128)
+    vector: EmbeddingVector
+    content_hash: str | None = Field(default=None, max_length=128)
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+
+class MemorySearchResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    memory: MemoryUnit
+    distance: float = Field(ge=0)
+    embedding_model: str
+
+
+class MemoryRelationship(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(default_factory=lambda: new_id("rel"))
+    subject: str = Field(min_length=1, max_length=256)
+    predicate: str = Field(min_length=1, max_length=128)
+    object_id: str = Field(min_length=1, max_length=256)
+    source_memory_id: str = Field(min_length=1)
+    confidence: float = Field(default=0.75, ge=0, le=1)
+    valid_from: datetime | None = None
+    valid_until: datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=_now)
+    updated_at: datetime = Field(default_factory=_now)
+
+    @model_validator(mode="after")
+    def validate_temporal_window(self) -> "MemoryRelationship":
+        if (
+            self.valid_from is not None
+            and self.valid_until is not None
+            and self.valid_until <= self.valid_from
+        ):
+            raise ValueError("valid_until must be after valid_from")
+        return self

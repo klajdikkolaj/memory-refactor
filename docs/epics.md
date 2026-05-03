@@ -9,7 +9,7 @@ Status legend:
 
 ## E0: Repo Foundation And Operating Model
 
-Status: `in-progress`
+Status: `done`
 
 Establish the monorepo, Codex workflow scaffold, local commands, docs, and validation rules needed to build safely.
 
@@ -35,14 +35,14 @@ Success criteria:
 
 ## E2: Ingestion And Source Archive
 
-Status: `planned`
+Status: `in-progress`
 
 Accept raw memory inputs from notes, conversations, imports, and API calls while preserving source evidence.
 
 Success criteria:
 
 - Raw memory event endpoint exists.
-- Source excerpts and metadata are stored.
+- Source content and metadata are stored.
 - Large archive storage is abstracted behind a port.
 - R2/S3 can be added later without changing core contracts.
 
@@ -61,7 +61,7 @@ Success criteria:
 
 ## E4: Refactor Agent And Typed Operations
 
-Status: `planned`
+Status: `in-progress`
 
 Build the AI memory compiler that proposes schema-valid operations rather than free-form summaries.
 
@@ -74,7 +74,7 @@ Success criteria:
 
 ## E5: Durable Workflows
 
-Status: `planned`
+Status: `in-progress`
 
 Use Temporal for long-running memory refactor jobs, retries, review checkpoints, and transactional application.
 

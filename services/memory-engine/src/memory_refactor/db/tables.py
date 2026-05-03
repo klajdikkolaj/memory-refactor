@@ -3,7 +3,20 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -46,6 +59,64 @@ class MemoryUnitRecord(TimestampMixin, Base):
         cascade="all, delete-orphan",
     )
     versions: Mapped[list[MemoryVersionRecord]] = relationship(back_populates="memory")
+    embeddings: Mapped[list[MemoryEmbeddingRecord]] = relationship(
+        back_populates="memory",
+        cascade="all, delete-orphan",
+    )
+    relationships: Mapped[list[MemoryRelationshipRecord]] = relationship(
+        back_populates="source_memory",
+        cascade="all, delete-orphan",
+    )
+
+
+class MemoryEmbeddingRecord(TimestampMixin, Base):
+    __tablename__ = "memory_embeddings"
+    __table_args__ = (
+        UniqueConstraint(
+            "memory_id",
+            "embedding_model",
+            "dimensions",
+            name="uq_memory_embeddings_memory_model_dimensions",
+        ),
+        Index("ix_memory_embeddings_model_dimensions", "embedding_model", "dimensions"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("emb"))
+    memory_id: Mapped[str] = mapped_column(ForeignKey("memory_units.id"), index=True, nullable=False)
+    embedding_model: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    dimensions: Mapped[int] = mapped_column(Integer, nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(Vector(), nullable=False)
+    content_hash: Mapped[str | None] = mapped_column(String(128))
+
+    memory: Mapped[MemoryUnitRecord] = relationship(back_populates="embeddings")
+
+
+class MemoryRelationshipRecord(TimestampMixin, Base):
+    __tablename__ = "memory_relationships"
+    __table_args__ = (
+        CheckConstraint(
+            "valid_until IS NULL OR valid_from IS NULL OR valid_until > valid_from",
+            name="ck_memory_relationships_valid_window",
+        ),
+        Index("ix_memory_relationships_subject_predicate", "subject", "predicate"),
+        Index("ix_memory_relationships_valid_window", "valid_from", "valid_until"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("rel"))
+    subject: Mapped[str] = mapped_column(String(256), index=True, nullable=False)
+    predicate: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
+    object_id: Mapped[str] = mapped_column(String(256), index=True, nullable=False)
+    source_memory_id: Mapped[str] = mapped_column(
+        ForeignKey("memory_units.id"),
+        index=True,
+        nullable=False,
+    )
+    confidence: Mapped[float] = mapped_column(Float, default=0.75, nullable=False)
+    valid_from: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    extra: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict, nullable=False)
+
+    source_memory: Mapped[MemoryUnitRecord] = relationship(back_populates="relationships")
 
 
 class RawMemoryEventRecord(Base):
@@ -135,7 +206,12 @@ class MemoryOperationRecord(TimestampMixin, Base):
     rationale: Mapped[str] = mapped_column(Text, nullable=False)
     confidence: Mapped[float] = mapped_column(Float, default=0.75, nullable=False)
     requires_human_review: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    review_status: Mapped[str] = mapped_column(String(32), default="needs_review", index=True)
+    review_status: Mapped[str] = mapped_column(
+        String(32),
+        default="needs_review",
+        index=True,
+        nullable=False,
+    )
     extra: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict, nullable=False)
 
     run: Mapped[RefactorRunRecord] = relationship(back_populates="operations")

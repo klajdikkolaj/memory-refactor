@@ -76,6 +76,18 @@ async def create_raw_memory_event(
     return raw_memory_event_from_record(record)
 
 
+async def create_raw_memory_events(
+    session: AsyncSession,
+    events: list[RawMemoryEvent],
+) -> list[RawMemoryEvent]:
+    records = [raw_memory_event_to_record(event) for event in events]
+
+    async with session.begin():
+        session.add_all(records)
+
+    return [raw_memory_event_from_record(record) for record in records]
+
+
 async def mark_raw_memory_events_processed(
     session: AsyncSession,
     event_ids: list[str],

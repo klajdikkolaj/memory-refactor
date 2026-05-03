@@ -2,8 +2,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from memory_refactor.core.models import MemorySource, MemoryUnit
-from memory_refactor.db.tables import MemorySourceRecord, MemoryUnitRecord
+from memory_refactor.core.models import MemorySource, MemoryUnit, MemoryVersion
+from memory_refactor.db.tables import MemorySourceRecord, MemoryUnitRecord, MemoryVersionRecord
 
 
 def memory_unit_from_record(record: MemoryUnitRecord) -> MemoryUnit:
@@ -51,6 +51,28 @@ def memory_unit_to_record(memory: MemoryUnit) -> MemoryUnitRecord:
             )
             for source in memory.sources
         ],
+    )
+
+
+def memory_version_from_record(record: MemoryVersionRecord) -> MemoryVersion:
+    return MemoryVersion(
+        id=record.id,
+        memory_id=record.memory_id,
+        version=record.version,
+        snapshot=MemoryUnit.model_validate(record.snapshot),
+        operation_id=record.operation_id,
+        created_at=record.created_at,
+    )
+
+
+def memory_version_to_record(version: MemoryVersion) -> MemoryVersionRecord:
+    return MemoryVersionRecord(
+        id=version.id,
+        memory_id=version.memory_id,
+        version=version.version,
+        snapshot=version.snapshot.model_dump(mode="json"),
+        operation_id=version.operation_id,
+        created_at=version.created_at,
     )
 
 

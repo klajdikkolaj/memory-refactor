@@ -55,7 +55,7 @@ Acceptance criteria:
 
 ### S1.1: Define Core Memory Contracts
 
-Status: `in-progress`
+Status: `done`
 
 As an API developer, I want typed memory contracts so LLM output, API payloads, and database records share the same domain language.
 
@@ -67,7 +67,7 @@ Acceptance criteria:
 
 ### S1.2: Persist Memory Units
 
-Status: `in-progress`
+Status: `done`
 
 As the system, I want to store memory units in Postgres so canonical memory has a transactional source of truth.
 
@@ -80,7 +80,7 @@ Acceptance criteria:
 
 ### S1.3: Persist Refactor Runs And Operations
 
-Status: `todo`
+Status: `done`
 
 As a reviewer, I want refactor runs and operations stored so Memory PRs can be inspected and applied later.
 
@@ -88,21 +88,22 @@ Acceptance criteria:
 
 - Refactor run and operation tables exist.
 - Preview endpoint persists a run instead of returning only seed data.
-- Operations keep rationale, confidence, and source memory IDs.
+- Operations keep rationale, confidence, source memory IDs, and source event IDs.
 
 ## E2: Ingestion And Source Archive
 
 ### S2.1: Ingest Raw Memory Events
 
-Status: `todo`
+Status: `done`
 
 As an integrator, I want to submit raw memory events so conversations and imports can enter the refactor pipeline.
 
 Acceptance criteria:
 
 - API endpoint accepts raw event payloads.
-- Source metadata and excerpt are stored.
+- Source content and metadata are stored.
 - Validation errors are explicit.
+- Manual pasted-memory batch flow can create multiple raw events and start a refactor run.
 
 ### S2.2: Preserve Raw Archives Behind A Port
 
@@ -120,7 +121,7 @@ Acceptance criteria:
 
 ### S3.1: Add pgvector Embeddings
 
-Status: `todo`
+Status: `done`
 
 As the refactor agent, I want semantic retrieval so related memories can be considered together.
 
@@ -132,7 +133,7 @@ Acceptance criteria:
 
 ### S3.2: Add Relationship Retrieval
 
-Status: `todo`
+Status: `done`
 
 As the refactor agent, I want relationship-aware retrieval so old and current facts can be compared.
 
@@ -172,7 +173,7 @@ Acceptance criteria:
 
 ### S5.1: Run Refactor Workflow Through Temporal
 
-Status: `todo`
+Status: `done`
 
 As an operator, I want memory refactor jobs to survive retries and restarts.
 
@@ -184,7 +185,7 @@ Acceptance criteria:
 
 ### S5.2: Apply Approved Operations Transactionally
 
-Status: `todo`
+Status: `done`
 
 As a reviewer, I want approved memory operations applied atomically so memory is never partially refactored.
 
@@ -198,7 +199,7 @@ Acceptance criteria:
 
 ### S6.1: Display Refactor Runs From API
 
-Status: `todo`
+Status: `done`
 
 As a reviewer, I want the dashboard to show real refactor runs so I can choose what to inspect.
 
@@ -210,7 +211,7 @@ Acceptance criteria:
 
 ### S6.2: Review Operation Detail And Sources
 
-Status: `todo`
+Status: `done`
 
 As a reviewer, I want to inspect operation rationale and sources before approving memory changes.
 
@@ -222,7 +223,7 @@ Acceptance criteria:
 
 ### S6.3: Approve Or Reject Operations
 
-Status: `todo`
+Status: `done`
 
 As a reviewer, I want to approve or reject operations so only trusted memory changes are applied.
 
@@ -300,7 +301,7 @@ Acceptance criteria:
 
 ### S9.2: Prepare Backend Test Harness
 
-Status: `in-progress`
+Status: `done`
 
 As a backend developer, I want unit and integration test commands so persistence and API behavior can be verified safely.
 
@@ -313,7 +314,7 @@ Acceptance criteria:
 
 ### S9.3: Prepare Frontend Test Harness
 
-Status: `in-progress`
+Status: `done`
 
 As a frontend developer, I want component and E2E test commands so the review UI can be verified before shipping.
 

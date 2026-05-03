@@ -1,6 +1,13 @@
+from datetime import datetime, timezone
+
+import pytest
+from pydantic import ValidationError
+
 from memory_refactor.core.models import (
+    EmbeddingVector,
     MemoryKind,
     MemoryOperation,
+    MemoryRelationship,
     MemoryUnit,
     OperationKind,
     RawMemoryEvent,
@@ -51,3 +58,38 @@ def test_seed_raw_event_refactor_plan_produces_source_grounded_create_operation(
         "evt_stack",
         "evt_goal",
     ]
+
+
+def test_embedding_vector_tracks_dimensions() -> None:
+    vector = EmbeddingVector(values=[0.1, 0.2, 0.3])
+
+    assert vector.dimensions == 3
+
+
+def test_embedding_vector_rejects_non_finite_values() -> None:
+    with pytest.raises(ValidationError):
+        EmbeddingVector(values=[0.1, float("nan")])
+
+
+def test_memory_relationship_accepts_open_temporal_window() -> None:
+    relationship = MemoryRelationship(
+        subject="user",
+        predicate="works_on",
+        object_id="memory-refactor",
+        source_memory_id="mem_project",
+        valid_from=datetime(2026, 5, 1, tzinfo=timezone.utc),
+    )
+
+    assert relationship.valid_until is None
+
+
+def test_memory_relationship_rejects_inverted_temporal_window() -> None:
+    with pytest.raises(ValidationError):
+        MemoryRelationship(
+            subject="user",
+            predicate="works_on",
+            object_id="memory-refactor",
+            source_memory_id="mem_project",
+            valid_from=datetime(2026, 5, 2, tzinfo=timezone.utc),
+            valid_until=datetime(2026, 5, 1, tzinfo=timezone.utc),
+        )

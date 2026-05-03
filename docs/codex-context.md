@@ -22,6 +22,10 @@ The product should behave like an AI infrastructure system:
 
 ## Planning Docs
 
+- `docs/product-vision.md`: product concept, principles, and MVP boundary.
+- `docs/architecture.md`: runtime boundaries, diagrams, and future adapter strategy.
+- `docs/mvp-flow.md`: manual pasted-memory to Memory PR demo path.
+- `docs/data-model.md`: canonical contracts, tables, and invariants.
 - `docs/epics.md`: durable product epics and success criteria.
 - `docs/stories.md`: user/operator stories grouped by epic.
 - `docs/tasks.md`: implementation queue with priorities and status.
