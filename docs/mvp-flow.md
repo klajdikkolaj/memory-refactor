@@ -247,6 +247,5 @@ Expected clean memories:
 
 ## Implementation Order
 
-1. `S4.2`: wire the Pydantic AI refactor agent behind the planner port.
-2. Expand apply semantics beyond `create_memory`.
-3. Expand apply semantics beyond `create_memory`.
+1. Expand apply semantics beyond `create_memory`.
+2. Add trace metadata to refactor runs.

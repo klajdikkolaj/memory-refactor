@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/memory-engine/uv.lock
+
+      - name: Check structure
+        run: make check-structure
+
+      - name: Lint memory engine
+        working-directory: services/memory-engine
+        run: uv run --extra dev ruff check src tests alembic
+
+      - name: Test memory engine units
+        run: make test-python-unit
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check web
+        run: make check-web
+
+      - name: Test web units
+        run: make test-web-unit
+
+  backend-integration:
+    name: Backend integration
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: memory_refactor
+          POSTGRES_USER: memory_refactor
+          POSTGRES_PASSWORD: memory_refactor
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U memory_refactor -d memory_refactor"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: services/memory-engine/uv.lock
+
+      - name: Run migrations
+        run: make migrate
+
+      - name: Test memory engine integrations
+        run: make test-python-integration

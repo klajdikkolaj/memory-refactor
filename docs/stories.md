@@ -159,7 +159,7 @@ Acceptance criteria:
 
 ### S4.2: Wire Pydantic AI Refactor Agent
 
-Status: `todo`
+Status: `done`
 
 As a user, I want the system to propose high-quality memory operations from related memories.
 
@@ -237,7 +237,7 @@ Acceptance criteria:
 
 ### S7.1: Add Trace IDs To Refactor Runs
 
-Status: `todo`
+Status: `done`
 
 As an operator, I want each run linked to trace metadata so model and workflow behavior can be debugged.
 
@@ -249,7 +249,7 @@ Acceptance criteria:
 
 ### S7.2: Capture Human Feedback As Eval Data
 
-Status: `todo`
+Status: `done`
 
 As a product builder, I want rejects and edits to become evaluation data so the agent improves over time.
 
@@ -326,7 +326,7 @@ Acceptance criteria:
 
 ### S9.4: Add CI Quality Gate
 
-Status: `todo`
+Status: `done`
 
 As a maintainer, I want CI to run the default gate so regressions are caught before merge.
 

@@ -11,6 +11,7 @@ def test_database_metadata_contains_initial_tables() -> None:
         "memory_relationships",
         "refactor_runs",
         "memory_operations",
+        "review_decisions",
         "memory_versions",
         "contradictions",
     }.issubset(Base.metadata.tables)

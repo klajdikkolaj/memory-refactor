@@ -5,6 +5,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from memory_refactor.core.ids import new_id
+from memory_refactor.core.agents import build_refactor_agent
 from memory_refactor.core.models import (
     MemoryKind,
     MemoryOperation,
@@ -14,7 +15,6 @@ from memory_refactor.core.models import (
     RefactorPlan,
     RefactorRunStatus,
 )
-from memory_refactor.core.operations import propose_seed_refactor_plan
 from memory_refactor.db.repositories.raw_memory_events import list_raw_memory_events_by_ids
 from memory_refactor.db.repositories.refactor_runs import (
     InvalidApprovedMemoryOperationError,
@@ -70,6 +70,7 @@ class StartRefactorRunResponse(BaseModel):
     run_id: str
     workflow_id: str
     temporal_run_id: str | None = None
+    trace_id: str | None = None
     status: RefactorRunStatus
 
 
@@ -82,6 +83,7 @@ class ReviewMemoryOperationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: ReviewOperationDecision
+    reason: str | None = Field(default=None, max_length=2000)
 
 
 class ApplyMemoryOperationResponse(BaseModel):
@@ -167,6 +169,7 @@ async def start_refactor_run_from_raw_events(
         run_id=run_id,
         workflow_id=workflow_start.workflow_id,
         temporal_run_id=workflow_start.temporal_run_id,
+        trace_id=None,
         status=RefactorRunStatus.RUNNING,
     )
 
@@ -175,7 +178,7 @@ async def start_refactor_run_from_raw_events(
 async def preview_refactor_run(
     session: AsyncSession = Depends(get_async_session),
 ) -> RefactorPlan:
-    plan = propose_seed_refactor_plan(_seed_memories())
+    plan = await build_refactor_agent().propose_plan(_seed_memories())
     return await create_refactor_plan(session, plan)
 
 
@@ -211,6 +214,7 @@ async def review_memory_operation(
         run_id=run_id,
         operation_id=operation_id,
         review_status=OperationReviewStatus(request.decision.value),
+        reason=request.reason,
     )
     if operation is None:
         raise HTTPException(

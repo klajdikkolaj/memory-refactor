@@ -13,6 +13,8 @@ import type { ApiRefactorPlan } from "@/lib/types";
 const apiPlan: ApiRefactorPlan = {
   id: "plan_123",
   run_id: "run_123",
+  workflow_id: "refactor-run_123",
+  trace_id: null,
   status: "needs_review",
   summary: "API-backed memory cleanup",
   input_event_ids: ["evt_1", "evt_2"],

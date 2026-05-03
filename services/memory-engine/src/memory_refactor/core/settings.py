@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
     litellm_base_url: str | None = None
+    refactor_agent_model: str | None = None
+    refactor_agent_retries: int = 1
     langfuse_public_key: str | None = None
     langfuse_secret_key: str | None = None
     langfuse_host: str | None = None

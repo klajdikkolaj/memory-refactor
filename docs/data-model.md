@@ -135,6 +135,8 @@ Current fields:
 
 - `id`
 - `run_id`
+- `workflow_id`
+- `trace_id`
 - `status`
 - `summary`
 - `input_event_ids`
@@ -147,6 +149,7 @@ Rules:
 - A plan is the Memory PR payload.
 - A plan should be persisted before raw events are considered processed.
 - Failed or invalid plans should not mutate canonical memory.
+- Trace metadata may be null locally when instrumentation is disabled.
 
 ### Contradiction
 
@@ -229,6 +232,26 @@ Rules:
 - Open-ended validity is allowed, but `valid_until` must be after `valid_from` when both are present.
 - Graphiti-style graph storage remains optional behind the memory graph port.
 
+### ReviewDecision
+
+Purpose: immutable human feedback event for future eval datasets.
+
+Current fields:
+
+- `id`
+- `run_id`
+- `operation_id`
+- `decision`
+- `reason`
+- `metadata`
+- `created_at`
+
+Rules:
+
+- Review actions should append a decision record instead of only mutating operation state.
+- Rejection reasons are optional but should be preserved when provided.
+- Eval export rows should include `run_id`, `operation_id`, `decision`, `reason`, operation kind, source memory IDs, source event IDs, proposed memory, rationale, confidence, and timestamps.
+
 ## Database Tables
 
 Implemented or scaffolded tables:
@@ -240,13 +263,13 @@ Implemented or scaffolded tables:
 - `memory_relationships`
 - `refactor_runs`
 - `memory_operations`
+- `review_decisions`
 - `contradictions`
 - `memory_versions`
 
 Planned tables or columns:
 
 - audit logs
-- review decisions
 - eval exports
 - object archive references
 
@@ -259,6 +282,7 @@ Canonical:
 - memory sources
 - refactor runs
 - memory operations
+- review decisions
 - contradictions
 - memory versions
 
