@@ -171,6 +171,7 @@ async def test_manual_batch_endpoint_creates_events_and_starts_workflow_against_
     assert payload["source_id"] == "paste_batch"
     assert payload["status"] == RefactorRunStatus.RUNNING.value
     assert payload["temporal_run_id"] == "temporal_run_batch"
+    assert payload["trace_id"] is None
     assert fake_starter.calls[0][2] == payload["raw_event_ids"]
     assert [event.content for event in events] == [
         "I use Go and React.",

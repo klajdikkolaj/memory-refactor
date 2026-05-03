@@ -53,14 +53,21 @@ pnpm --filter @memory-refactor/web exec playwright install
 make test-web-e2e
 ```
 
-## CI Plan
+## CI Gate
 
-Initial PR gate:
+GitHub Actions runs the default PR gate in `.github/workflows/ci.yml`:
 
 1. `make check-structure`
-2. `make test-python-unit`
-3. `make check-web`
-4. `make test-web-unit`
+2. `uv run --extra dev ruff check src tests alembic`
+3. `make test-python-unit`
+4. `make check-web`
+5. `make test-web-unit`
+
+The same workflow also runs a separate Postgres-backed integration job:
+
+1. Start `pgvector/pgvector:pg16`.
+2. Run `make migrate`.
+3. Run `make test-python-integration`.
 
 Persistence PR gate:
 

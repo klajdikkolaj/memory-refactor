@@ -187,6 +187,10 @@ class RefactorRunRecord(TimestampMixin, Base):
         back_populates="run",
         cascade="all, delete-orphan",
     )
+    review_decisions: Mapped[list[ReviewDecisionRecord]] = relationship(
+        back_populates="run",
+        cascade="all, delete-orphan",
+    )
 
 
 class MemoryOperationRecord(TimestampMixin, Base):
@@ -216,6 +220,39 @@ class MemoryOperationRecord(TimestampMixin, Base):
 
     run: Mapped[RefactorRunRecord] = relationship(back_populates="operations")
     versions: Mapped[list[MemoryVersionRecord]] = relationship(back_populates="operation")
+    review_decisions: Mapped[list[ReviewDecisionRecord]] = relationship(
+        back_populates="operation_record",
+        cascade="all, delete-orphan",
+    )
+
+
+class ReviewDecisionRecord(Base):
+    __tablename__ = "review_decisions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=lambda: new_id("rev"))
+    refactor_run_id: Mapped[str] = mapped_column(
+        ForeignKey("refactor_runs.id"),
+        index=True,
+        nullable=False,
+    )
+    operation_id: Mapped[str] = mapped_column(
+        ForeignKey("memory_operations.id"),
+        index=True,
+        nullable=False,
+    )
+    decision: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text)
+    extra: Mapped[dict[str, Any]] = mapped_column("metadata", JSON, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    run: Mapped[RefactorRunRecord] = relationship(back_populates="review_decisions")
+    operation_record: Mapped[MemoryOperationRecord] = relationship(
+        back_populates="review_decisions"
+    )
 
 
 class MemoryVersionRecord(Base):

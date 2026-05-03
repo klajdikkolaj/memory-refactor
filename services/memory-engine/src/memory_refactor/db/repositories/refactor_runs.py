@@ -13,6 +13,7 @@ from memory_refactor.core.models import (
     MemoryUnit,
     RefactorPlan,
     RefactorRunStatus,
+    ReviewDecision,
 )
 from memory_refactor.db.repositories.memory_units import memory_unit_to_record
 from memory_refactor.db.tables import (
@@ -22,6 +23,7 @@ from memory_refactor.db.tables import (
     MemoryVersionRecord,
     RefactorRunRecord,
     RawMemoryEventRecord,
+    ReviewDecisionRecord,
 )
 
 
@@ -139,12 +141,38 @@ def _contradiction_to_record(contradiction: Contradiction, *, run_id: str) -> Co
     )
 
 
+def review_decision_from_record(record: ReviewDecisionRecord) -> ReviewDecision:
+    return ReviewDecision(
+        id=record.id,
+        run_id=record.refactor_run_id,
+        operation_id=record.operation_id,
+        decision=record.decision,
+        reason=record.reason,
+        metadata=record.extra,
+        created_at=record.created_at,
+    )
+
+
+def review_decision_to_record(decision: ReviewDecision) -> ReviewDecisionRecord:
+    return ReviewDecisionRecord(
+        id=decision.id,
+        refactor_run_id=decision.run_id,
+        operation_id=decision.operation_id,
+        decision=decision.decision.value,
+        reason=decision.reason,
+        extra=decision.metadata,
+        created_at=decision.created_at,
+    )
+
+
 def refactor_plan_from_record(record: RefactorRunRecord) -> RefactorPlan:
     operations = sorted(record.operations, key=lambda operation: operation.position)
 
     return RefactorPlan(
         id=record.plan_id,
         run_id=record.id,
+        workflow_id=record.workflow_id,
+        trace_id=record.trace_id,
         status=record.status,
         summary=record.summary,
         input_event_ids=record.input_event_ids,
@@ -160,6 +188,8 @@ def refactor_plan_to_record(plan: RefactorPlan) -> RefactorRunRecord:
     return RefactorRunRecord(
         id=plan.run_id,
         plan_id=plan.id,
+        workflow_id=plan.workflow_id,
+        trace_id=plan.trace_id,
         status=plan.status.value,
         summary=plan.summary,
         input_event_ids=plan.input_event_ids,
@@ -312,12 +342,14 @@ async def create_refactor_run_shell(
     summary: str,
     input_event_ids: list[str] | None = None,
     status: RefactorRunStatus = RefactorRunStatus.PENDING,
+    trace_id: str | None = None,
 ) -> RefactorPlan:
     record = RefactorRunRecord(
         id=run_id,
         status=status.value,
         summary=summary,
         workflow_id=workflow_id,
+        trace_id=trace_id,
         input_event_ids=input_event_ids or [],
         operations=[],
         contradictions=[],
@@ -330,6 +362,8 @@ async def create_refactor_run_shell(
     return RefactorPlan(
         id=record.plan_id,
         run_id=record.id,
+        workflow_id=record.workflow_id,
+        trace_id=record.trace_id,
         status=record.status,
         summary=record.summary,
         input_event_ids=record.input_event_ids,
@@ -345,6 +379,7 @@ async def update_refactor_run_status(
     status: RefactorRunStatus,
     *,
     workflow_id: str | None = None,
+    trace_id: str | None = None,
 ) -> RefactorPlan | None:
     async with session.begin():
         result = await session.scalars(
@@ -358,6 +393,8 @@ async def update_refactor_run_status(
         record.status = status.value
         if workflow_id is not None:
             record.workflow_id = workflow_id
+        if trace_id is not None:
+            record.trace_id = trace_id
 
     return await get_refactor_plan(session, run_id)
 
@@ -368,6 +405,7 @@ async def update_memory_operation_review_status(
     run_id: str,
     operation_id: str,
     review_status: OperationReviewStatus,
+    reason: str | None = None,
 ) -> MemoryOperation | None:
     async with session.begin():
         result = await session.scalars(
@@ -382,9 +420,36 @@ async def update_memory_operation_review_status(
             return None
 
         record.review_status = review_status.value
+        session.add(
+            review_decision_to_record(
+                ReviewDecision(
+                    run_id=run_id,
+                    operation_id=operation_id,
+                    decision=review_status,
+                    reason=reason,
+                )
+            )
+        )
         await session.flush()
 
         return _operation_from_record(record)
+
+
+async def list_review_decisions(
+    session: AsyncSession,
+    *,
+    run_id: str | None = None,
+    operation_id: str | None = None,
+) -> list[ReviewDecision]:
+    statement = select(ReviewDecisionRecord).order_by(ReviewDecisionRecord.created_at.asc())
+
+    if run_id is not None:
+        statement = statement.where(ReviewDecisionRecord.refactor_run_id == run_id)
+    if operation_id is not None:
+        statement = statement.where(ReviewDecisionRecord.operation_id == operation_id)
+
+    result = await session.scalars(statement)
+    return [review_decision_from_record(record) for record in result]
 
 
 async def apply_approved_create_memory_operation(

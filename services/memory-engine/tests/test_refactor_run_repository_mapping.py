@@ -10,10 +10,13 @@ from memory_refactor.core.models import (
     OperationReviewStatus,
     RefactorPlan,
     RefactorRunStatus,
+    ReviewDecision,
 )
 from memory_refactor.db.repositories.refactor_runs import (
     refactor_plan_from_record,
     refactor_plan_to_record,
+    review_decision_from_record,
+    review_decision_to_record,
 )
 
 
@@ -58,6 +61,8 @@ def test_refactor_plan_record_mapping_round_trips_contract_fields() -> None:
     plan = RefactorPlan(
         id="plan_stack",
         run_id="run_stack",
+        workflow_id="workflow_stack",
+        trace_id="trace_stack",
         status=RefactorRunStatus.NEEDS_REVIEW,
         summary="Stack refactor proposal.",
         input_event_ids=["evt_ts", "evt_python"],
@@ -71,12 +76,16 @@ def test_refactor_plan_record_mapping_round_trips_contract_fields() -> None:
 
     assert record.id == "run_stack"
     assert record.plan_id == "plan_stack"
+    assert record.workflow_id == "workflow_stack"
+    assert record.trace_id == "trace_stack"
     assert record.input_event_ids == ["evt_ts", "evt_python"]
     assert record.operations[0].position == 0
     assert record.operations[0].source_event_ids == ["evt_ts", "evt_python"]
     assert record.operations[0].review_status == "approved"
     assert mapped.id == "plan_stack"
     assert mapped.run_id == "run_stack"
+    assert mapped.workflow_id == "workflow_stack"
+    assert mapped.trace_id == "trace_stack"
     assert mapped.input_event_ids == ["evt_ts", "evt_python"]
     assert mapped.status is RefactorRunStatus.NEEDS_REVIEW
     assert mapped.operations[0].operation is OperationKind.MERGE_MEMORIES
@@ -84,3 +93,24 @@ def test_refactor_plan_record_mapping_round_trips_contract_fields() -> None:
     assert mapped.operations[0].review_status is OperationReviewStatus.APPROVED
     assert mapped.operations[0].proposed_memory == proposed_memory
     assert mapped.contradictions[0].proposed_resolution == operation
+
+
+def test_review_decision_record_mapping_round_trips_contract_fields() -> None:
+    captured_at = datetime(2026, 5, 3, tzinfo=timezone.utc)
+    decision = ReviewDecision(
+        id="rev_1",
+        run_id="run_stack",
+        operation_id="op_merge",
+        decision=OperationReviewStatus.REJECTED,
+        reason="The proposed memory overstates the source.",
+        metadata={"surface": "api"},
+        created_at=captured_at,
+    )
+
+    record = review_decision_to_record(decision)
+    mapped = review_decision_from_record(record)
+
+    assert record.refactor_run_id == "run_stack"
+    assert record.operation_id == "op_merge"
+    assert record.decision == "rejected"
+    assert mapped == decision

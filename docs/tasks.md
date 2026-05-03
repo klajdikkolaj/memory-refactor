@@ -39,23 +39,23 @@ Priority legend:
 | T2.2 | S2.1 | P0 | done | Add manual raw memory batch ingestion flow | `POST /raw-memory-events/manual-batches` creates raw events and starts a refactor run. |
 | T3.1 | S3.1 | P1 | done | Add pgvector embedding persistence | Added typed embedding contracts, `memory_embeddings`, and Postgres nearest-neighbor repository. |
 | T3.2 | S3.2 | P1 | done | Add Postgres relationship table for graph-like MVP | Added temporal relationship contract, table, and Postgres memory graph repository. |
-| T4.1 | S4.2 | P1 | todo | Add Pydantic AI agent wrapper behind `RefactorAgent` port | Keep deterministic stub as fallback. |
-| T7.1 | S7.1 | P1 | todo | Add trace ID fields to refactor runs | Integration can be no-op locally. |
-| T7.2 | S7.2 | P2 | todo | Store review decisions for eval data | Useful after review UI is real. |
+| T4.1 | S4.2 | P1 | done | Add Pydantic AI agent wrapper behind `RefactorAgent` port | Added optional Pydantic AI wrapper with deterministic fallback. |
+| T7.1 | S7.1 | P1 | done | Add trace ID fields to refactor runs | API now returns nullable workflow and trace metadata. |
+| T7.2 | S7.2 | P2 | done | Store review decisions for eval data | Review endpoint now appends decision records with optional reasons. |
 | T8.1 | S8.1 | P2 | deferred | Add Qdrant adapter | Wait for retrieval scale or benchmark need. |
 | T8.2 | S8.2 | P2 | deferred | Add NATS event publisher adapter | Wait for cross-service event complexity. |
 | T9.1 | S9.1 | P0 | done | Add testing strategy document | Created `docs/testing-strategy.md`. |
 | T9.2 | S9.2 | P0 | done | Add backend pytest unit/integration harness | Added markers, unit command, integration command, and repository tests. |
 | T9.3 | S9.3 | P0 | done | Add frontend component and E2E test harness | Added Vitest, Testing Library, Playwright config, and smoke tests. |
-| T9.4 | S9.4 | P1 | todo | Add CI quality gate | Run default checks in GitHub Actions or chosen CI. |
+| T9.4 | S9.4 | P1 | done | Add CI quality gate | GitHub Actions runs the default gate plus a Postgres-backed integration job. |
 | T0.4 | S0.2 | P0 | done | Add repo-specific workflow skills | Added DB, API contract, UI, test gate, memory operation, and ship-change skills. |
 | T0.5 | S0.2 | P0 | done | Add read-only repo reviewer agents | Added DB, UI, test gate, and architecture reviewer agents. |
 
 ## Current Next Slice
 
-Recommended next implementation task: `T4.1`.
+Recommended next implementation task: none in the non-deferred queue.
 
-Reason: semantic and relationship retrieval persistence now exist behind local adapters. The next agent gap is replacing the deterministic-only planner path with a Pydantic AI wrapper while keeping the stub as fallback.
+Reason: the main product-loop persistence, retrieval, agent fallback, review, apply, eval-data scaffolding, and CI gates are now in place. The only remaining tracked tasks are deferred scale-out adapters (`T8.1` Qdrant and `T8.2` NATS) that should wait for concrete scale or cross-service event needs.
 
 ## Recently Completed
 
@@ -78,8 +78,12 @@ Reason: semantic and relationship retrieval persistence now exist behind local a
 - `T2.2`: Manual pasted-memory batch endpoint that creates raw events and starts a refactor run.
 - `T3.1`: pgvector-backed memory embedding persistence and nearest-neighbor retrieval adapter.
 - `T3.2`: Postgres-backed temporal relationship persistence and retrieval adapter.
+- `T4.1`: Pydantic AI refactor agent wrapper with deterministic fallback and source-grounding checks.
+- `T7.1`: Refactor run workflow and trace metadata exposed through backend and web API contracts.
+- `T7.2`: Review decisions persisted with optional reasons for future eval exports.
 - `T9.1`: Testing strategy.
 - `T9.2`: Backend test harness.
 - `T9.3`: Frontend test harness.
+- `T9.4`: GitHub Actions CI quality gate for default checks.
 - `T0.4`: Repo-specific workflow skills.
 - `T0.5`: Read-only reviewer agents.

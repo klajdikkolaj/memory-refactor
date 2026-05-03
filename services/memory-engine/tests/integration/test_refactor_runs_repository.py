@@ -30,6 +30,7 @@ from memory_refactor.db.repositories.refactor_runs import (
     create_refactor_run_shell,
     create_refactor_plan,
     get_refactor_plan,
+    list_review_decisions,
     list_refactor_plans,
 )
 from memory_refactor.db.session import create_engine, dispose_engine, get_async_session
@@ -120,6 +121,7 @@ async def _patch_operation_review(
     run_id: str,
     operation_id: str,
     decision: str,
+    reason: str | None = None,
 ):
     async def override_session() -> AsyncIterator[AsyncSession]:
         async with sessionmaker() as session:
@@ -135,7 +137,7 @@ async def _patch_operation_review(
         ) as client:
             return await client.patch(
                 f"/refactor-runs/{run_id}/operations/{operation_id}/review",
-                json={"decision": decision},
+                json={"decision": decision, **({"reason": reason} if reason else {})},
             )
     finally:
         app.dependency_overrides.clear()
@@ -247,6 +249,7 @@ async def test_review_endpoint_approves_operation_against_database() -> None:
 
     async with sessionmaker() as session:
         stored = await get_refactor_plan(session, plan.run_id)
+        decisions = await list_review_decisions(session, run_id=plan.run_id)
 
     await engine.dispose()
 
@@ -256,6 +259,10 @@ async def test_review_endpoint_approves_operation_against_database() -> None:
     assert payload["review_status"] == "approved"
     assert stored is not None
     assert stored.operations[0].review_status is OperationReviewStatus.APPROVED
+    assert len(decisions) == 1
+    assert decisions[0].operation_id == plan.operations[0].id
+    assert decisions[0].decision is OperationReviewStatus.APPROVED
+    assert decisions[0].reason is None
 
 
 @pytest.mark.asyncio
@@ -273,10 +280,12 @@ async def test_review_endpoint_rejects_operation_against_database() -> None:
         run_id=plan.run_id,
         operation_id=plan.operations[0].id,
         decision="rejected",
+        reason="The source evidence does not support this memory.",
     )
 
     async with sessionmaker() as session:
         stored = await get_refactor_plan(session, plan.run_id)
+        decisions = await list_review_decisions(session, operation_id=plan.operations[0].id)
 
     await engine.dispose()
 
@@ -286,6 +295,9 @@ async def test_review_endpoint_rejects_operation_against_database() -> None:
     assert payload["review_status"] == "rejected"
     assert stored is not None
     assert stored.operations[0].review_status is OperationReviewStatus.REJECTED
+    assert len(decisions) == 1
+    assert decisions[0].decision is OperationReviewStatus.REJECTED
+    assert decisions[0].reason == "The source evidence does not support this memory."
 
 
 @pytest.mark.asyncio
@@ -633,13 +645,17 @@ async def test_start_endpoint_records_running_temporal_workflow_against_database
     assert response.status_code == 202
     assert payload["workflow_id"] == f"refactor-{payload['run_id']}"
     assert payload["temporal_run_id"] == "temporal_run_test"
+    assert payload["trace_id"] is None
     assert payload["status"] == RefactorRunStatus.RUNNING.value
     assert fake_starter.calls[0][0] == payload["run_id"]
     assert fake_starter.calls[0][2] == ["evt_stack", "evt_goal"]
     assert record is not None
     assert record.workflow_id == payload["workflow_id"]
+    assert record.trace_id is None
     assert record.input_event_ids == ["evt_stack", "evt_goal"]
     assert plans[0].status is RefactorRunStatus.RUNNING
+    assert plans[0].workflow_id == payload["workflow_id"]
+    assert plans[0].trace_id is None
     assert plans[0].operations == []
 
 

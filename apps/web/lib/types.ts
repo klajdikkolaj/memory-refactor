@@ -100,6 +100,8 @@ export type ApiMemoryUnit = {
 export type ApiRefactorPlan = {
   id: string;
   run_id: string;
+  workflow_id: string | null;
+  trace_id: string | null;
   status: ApiRefactorRunStatus;
   summary: string;
   input_event_ids: string[];

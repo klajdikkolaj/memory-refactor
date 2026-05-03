@@ -112,6 +112,18 @@ class MemoryOperation(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class ReviewDecision(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(default_factory=lambda: new_id("rev"))
+    run_id: str = Field(min_length=1)
+    operation_id: str = Field(min_length=1)
+    decision: OperationReviewStatus
+    reason: str | None = Field(default=None, max_length=2000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=_now)
+
+
 class Contradiction(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -127,6 +139,8 @@ class RefactorPlan(BaseModel):
 
     id: str = Field(default_factory=lambda: new_id("plan"))
     run_id: str = Field(default_factory=lambda: new_id("run"))
+    workflow_id: str | None = None
+    trace_id: str | None = None
     status: RefactorRunStatus = RefactorRunStatus.NEEDS_REVIEW
     summary: str = Field(min_length=1)
     input_event_ids: list[str] = Field(default_factory=list)

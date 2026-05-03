@@ -63,6 +63,8 @@ const apiOperationSchema = z.object({
 const apiRefactorPlanSchema = z.object({
   id: z.string(),
   run_id: z.string(),
+  workflow_id: z.string().nullable(),
+  trace_id: z.string().nullable(),
   status: z.enum(["pending", "running", "needs_review", "applied", "failed"]),
   summary: z.string(),
   input_event_ids: z.array(z.string()),
@@ -144,10 +146,12 @@ export async function reviewMemoryOperation({
   runId,
   operationId,
   decision,
+  reason,
 }: {
   runId: string;
   operationId: string;
   decision: OperationReviewDecision;
+  reason?: string;
 }): Promise<MemoryOperation> {
   const response = await fetch(
     `${getClientApiBaseUrl()}/refactor-runs/${encodeURIComponent(
@@ -158,7 +162,7 @@ export async function reviewMemoryOperation({
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ decision }),
+      body: JSON.stringify({ decision, ...(reason ? { reason } : {}) }),
     },
   );
 

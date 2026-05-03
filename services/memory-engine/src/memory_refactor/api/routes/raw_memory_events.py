@@ -47,6 +47,7 @@ class CreateManualRawMemoryBatchResponse(BaseModel):
     run_id: str
     workflow_id: str
     temporal_run_id: str | None = None
+    trace_id: str | None = None
     status: RefactorRunStatus
 
 
@@ -83,6 +84,7 @@ async def create_manual_batch(
         run_id=refactor_start.run_id,
         workflow_id=refactor_start.workflow_id,
         temporal_run_id=refactor_start.temporal_run_id,
+        trace_id=refactor_start.trace_id,
         status=refactor_start.status,
     )
 
